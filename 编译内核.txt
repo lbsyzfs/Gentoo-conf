@@ -1,0 +1,13 @@
+ cd /usr/src
+ ls -l
+ cd linux
+ make menuconfig       or      make nconfig
+ sudo emerge pahole #(vmlinux报错)
+ make -j8
+ make install
+ cp /usr/src/linux/.config /etc/kernels/kernel-config-5.14.15-xanmod1-gentoo-x86_64
+ genkernel --install initramfs
+ grub-mkconfig -o /boot/grub/grub.cfg
+
+
+ intel-ucode/0f-06-08 ath10k/QCA9377/hw1.0/firmware-6.bin ath10k/QCA9377/hw1.0/board.bin ath10k/QCA9377/hw1.0/board-2.bin regulatory.db regulatory.db.p7s qca/rampatch_usb_00000302.bin qca/nvm_usb_00000302.bin amdgpu/topaz_mc.bin amdgpu/topaz_pfp.bin amdgpu/topaz_me.bin amdgpu/topaz_ce.bin amdgpu/topaz_rlc.bin amdgpu/topaz_mec.bin amdgpu/topaz_sdma.bin amdgpu/topaz_sdma1.bin amdgpu/topaz_k_smc.bin
