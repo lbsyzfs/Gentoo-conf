@@ -1,0 +1,249 @@
+#使用 sgdisk 来抹掉硬盘信息，使用cfdisk 来创建分区。假设你的硬盘是 sda 或者是 nvme0n1，那么首先保险的方法是用 sgdisk 来抹掉这个硬盘
+
+        sgdisk --zap-all /dev/sda 或者 sgdisk --zap-all /dev/nvme0n1
+
+使用 cfdisk 来对硬盘进行分区
+
+        cfdisk -z /dev/sda 或者 cfdisk -z /dev/nvme0n1
+
+注意:/efi 分区使用 vfat 文件系统格式，如果不单独分区 /efi ，那么 /boot 分区使用 vfat 文件系统格式,ZFS 文件系统的类型选择下面的 Solaris /usr & Apple ZFS
+
+假设我们的只创建一个 / 目录的 ZFS 文件系统，/ 目录使用 /dev/sdaX ，那么就可以通过下面的命令来创建
+
+zpool create -o ashift=12 -o cachefile= -O compression=zstd-fast -O normalization=formD -O acltype=posixacl -O relatime=on -O xattr=sa -O mountpoint=none -R /mnt/gentoo rpool /dev/sda3
+
+通过以下命令完成 ZFS 在 LiveUSB 模式下的挂载：
+
+zfs create -o canmount=off -o mountpoint=none rpool/ROOT
+（rpool 下创建一个名字叫做 ROOT 的，没有挂载点的 dataset）
+zfs create -o mountpoint=/ -o canmount=noauto rpool/ROOT/default
+（rpool/ROOT/ 下创建一个 default 的 dataset，挂载点是 / 目录，不自动挂载）
+
+创建 /mnt/gentoo 目录
+
+mkdir -p /mnt/gentoo
+
+用命令将 rpool/ROOT/default 挂载到 /mnt/gentoo 下：
+
+zfs mount rpool/ROOT/default
+
+创建 /boot 或者 /boot/efi 分区，这里再次强调，如果使用 ZFS 系统，单独分区 /boot 和 / 就可以了，单独分区 /efi /boot / 是没有必要的，反而增加后续维护难度
+
+mkdir -p /mnt/gentoo/boot
+mount /dev/sda1 /mnt/gentoo/boot
+
+完成了文件系统的挂载之后，可以使用 df -h 来查看下我们需要挂载的内容是否正确，如果是 zfs 文件系统，可以配合 zfs list 和 df -h 一起查看
+
+df -h              zfs list
+
+准备 stage3 和配置目标 Gentoo Linux 的配置，为下一步 chroot 做准备
+进入镜像站，使用方向及回车键定位到 releases/amd64/autobuilds/ 目录并寻找stage3，然后复制文件链接
+https://mirrors.bfsu.edu.cn/gentoo/
+进入目标文件夹
+cd /mnt/gentoo
+使用wget下载文件
+wget
+解压文件到当前目录
+tar xvpf
+删除xz文件
+rm
+配置的 Gentoo Linux /etc/fstab 文件
+使用用 Archlinux 的 LiveUSB ISO 这里就使用一条命令搞定
+genfstab -U /mnt/gentoo >> /mnt/gentoo/etc/fstab
+cat查看或nano 自定义下，使用 ZFS 文件系统，需要 nano 进去把 zfs 文件系统那个部分注释掉，没有tmpfs记得添加
+nano -w  /mnt/gentoo/etc/fstab
+
+tmpfs            /tmp           tmpfs     rw,nosuid,noatime,nodev,relatime,mode=1777,size=6G               0 0
+内存tmpfs(/tmp目录)的大小，2G内存设为1G、4G内存设为2G、8G内存可设为4-6G、16G内存可设为10-13G
+
+定制 Gentoo Linux 了，需要配置以下项目
+nano -w /mnt/gentoo/etc/portage/make.conf
+mkdir -p /mnt/gentoo/etc/portage/repos.conf
+nano -w /mnt/gentoo/etc/portage/repos.conf/gentoo.conf
+
+[gentoo]
+location   = /var/db/repos/gentoo
+auto-sync  = yes
+sync-type  = rsync
+sync-uri   = rsync://mirrors.bfsu.edu.cn/gentoo-portage
+# 国内我这里建议可以使用北外的镜像站，其负载小，带宽大，更新迅速。
+# 其它国内的镜像站我所知的还有：
+#   TUNA： rsync://mirrors.tuna.tsinghua.edu.cn/gentoo-portage
+#    163： rsync://mirrors.163.com/gentoo-portage
+#  中科大： rsync://rsync.mirrors.ustc.edu.cn/gentoo-portage/
+使用了 zfs 文件系统，需添加两个项目到package.accept_keywords
+
+nano -w /mnt/gentoo/etc/portage/package.accept_keywords
+
+sys-fs/zfs ~amd64
+=sys-fs/zfs-9999 **
+sys-fs/zfs-kmod ~amd64
+=sys-fs/zfs-kmod-9999 **
+
+使用 zfs 文件系统，并且使用 grub 作为 bootloader
+nano -w /mnt/gentoo/etc/portage/package.use/grub
+sys-boot/grub libzfs
+
+开始准备 chroot
+
+mkdir -p /mnt/gentoo/etc/zfs
+cp /etc/zfs/zpool.cache /mnt/gentoo/etc/zfs
+cp --dereference /etc/resolv.conf /mnt/gentoo/etc/
+mount --types proc /proc /mnt/gentoo/proc
+mount --rbind /sys /mnt/gentoo/sys
+mount --rbind /dev /mnt/gentoo/dev
+
+# 复制 DNS 配置到目标系统环境
+# 挂载必要的文件系统
+# /proc 是一个由内核暴露信息到环境下的伪文件系统
+# /sys 是类似 /proc 但比其更结构化的伪文件系统
+# /dev 是由 udev 管理，包含所有设备文件的普通文件系统
+
+#chroot到目标系统环境
+
+chroot /mnt/gentoo /bin/bash
+source /etc/profile
+PS1=(chroot)$PS1
+
+# 导入环境信息
+# 修改提示符以便于区分
+
+同步 portage
+
+emerge-webrsync
+emerge --sync
+
+第一个是用快照同步 portage，后者是用 rsync 同步，有时候第二个运行会提示我们刚刚运行过来，上锁了，只需要把对应目录的 lock 删掉就可以运行第二个命令用 rsync 同步了
+
+安装cpuid2cpuflags，检测cpu指令集
+
+emerge --ask app-portage/cpuid2cpuflags
+cpuid2cpuflags   
+#将输出值全部拷贝到/mnt/gentoo/etc/portage/make.conf中，作为“CPU_FLAGS_X86= ”的值，并取消对“CPU_FLAGS_X86= ”这一行的注释
+
+安装ccache加快编译速度
+
+emerge --ask ccache 
+
+完成安装后，用以下命令创建目录，设置权限
+
+mkdir -p /var/cache/ccache
+chown root:portage /var/cache/ccache -R
+chmod 2775 /var/cache/ccache -R
+
+编辑我们的 ccache 配置文件
+
+nano -w /var/cache/ccache/ccache.conf 
+
+max_size = 100.0G
+umask = 002
+cache_dir_levels = 3
+
+之后去掉/mnt/gentoo/etc/portage/make.conf中关于“ccache”的注释
+
+命令ccache -s显示缓存命中统计信息
+
+CCACHE_DIR=/var/cache/ccache ccache -s
+
+安装aria2加快emerge的下载速度
+
+emerge --ask aria2
+
+之后去掉/mnt/gentoo/etc/portage/make.conf中关于“aria2”的注释
+
+接下来，我们所要做的是，重新将整个基本系统从stage1编译到stage3，把原来官方提供的stage3 tarball里的所有组件替换成自己编译的（包括GCC编译器和所有基本系统组件）
+
+首先备份之前的locale和键盘设置
+
+qfile /etc/locale.gen /etc/conf.d/keymaps 
+ cp -v /etc/locale.gen{,.bak}
+
+从stage1到stage2（重新编译：emerge包管理器、GCC编译器、llvm编译器、clang编译器、zlib库、glibc库、libtool库）
+
+cd /var/db/repos/gentoo/scripts
+
+nano -w bootstrap.sh
+
+找到这一段
+
+# This stuff should never fail but will if not enough is installed.
+[[ -z ${myBASELAYOUT} ]] && myBASELAYOUT=">=$(portageq best_version / sys-apps/baselayout)"
+[[ -z ${myPORTAGE}    ]] && myPORTAGE="portage"
+[[ -z ${myBINUTILS}   ]] && myBINUTILS="binutils"   
+[[ -z ${myGCC}        ]] && myGCC="gcc"
+[[ -z ${myGETTEXT}    ]] && myGETTEXT="gettext"
+[[ -z ${myLIBC}       ]] && myLIBC="$(portageq expand_virtual / virtual/libc)"
+[[ -z ${myTEXINFO}    ]] && myTEXINFO="sys-apps/texinfo"
+[[ -z ${myZLIB}       ]] && myZLIB="zlib"
+[[ -z ${myNCURSES}    ]] && myNCURSES="ncurses"
+
+在里面
+
+[[ -z ${myLIBC}       ]] && myLIBC="$(portageq expand_virtual / virtual/libc)"
+改为
+[[ -z ${myLIBC}       ]] ; myLIBC="$(portageq expand_virtual / virtual/libc)"
+
+export USE="-* bootstrap ${ALLOWED_USE} ${BOOTSTRAP_USE}"
+改为
+export USE="-* bootstrap ${ALLOWED_USE} ${BOOTSTRAP_USE} openmp"
+
+
+./bootstrap.sh 
+
+这个脚本执行完检测后会要求你重新编译安装emerge包管理器，yes同意重新安装。
+重新编译安装完emerge包管理器后，bootstrap.sh脚本还会继续检测当前系统环境，最后很可能会警告提示你当前系统里的gcc编译器缺少对fortran的支持、zlib库缺少对minizip的支持，此时选no退出脚本。
+
+nano -w /etc/portage/make.conf:
+USE="fortran lto pgo graphite openmp minizip udev”
+
+
+emerge gcc  #重新编译安装GCC编译器（这里非常耗时，intel i5 8400编译用了一个小时）
+
+emerge zlib
+好了，现在针对你电脑CPU编译优化的emerge包管理器和GCC编译器（现已支持fortran）已经安装完成了。之后
+
+exit
+退出当前chroot环境
+
+再重新进入chroot环境
+
+chroot /mnt/gentoo /bin/bash
+env-update    
+source /etc/profile
+export PS1="(chroot) ${PS1}"
+加载新的emerge包管理器和GCC编译器
+用新的gcc编译器重新编译安装各种编译器和lib库
+
+emerge libtool 
+emerge binutils
+emerge llvm 
+emerge clang
+emerge libc
+emerge glibc
+
+重新运行一次脚本检测
+cd /var/db/repos/gentoo/scripts
+
+./bootstrap.sh 
+
+最后会成功通过检测，并提示你系统已经成功“bootstrapped”了，并要求你执行emerge -e @system
+
+从stage2到stage3（重新编译：基本系统的所有组件base system）
+
+emerge -e @system 
+
+#开始重新编译安装所有基本系统组件，耗时约3～4个小时（intel i5 8400的CPU）
+
+ok，完成后，你也就成功自己编译了一回stage3了。
+
+#设置回之前备份的locale
+
+mv -v /etc/locale.gen{.bak,}     
+locale-gen
+eselect locale list
+eselect locale set X             
+#这里仍然先只选择“C”！！
+
+
+接下来，正式安装gentoo系统
+
