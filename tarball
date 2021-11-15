@@ -1,0 +1,12 @@
+tar -cvpzf /media/stage3.tar.gz \
+--exclude=/media \
+--exclude=/media/stage3.tar.gz \
+--exclude=/proc \
+--exclude=/tmp \
+--exclude=/mnt \
+--exclude=/dev \
+--exclude=/sys \
+--exclude=/run \
+--exclude=/etc/zfs \
+--one-file-system /
+sudo tar -xvpzf /path/to/backup.tar.gz -C /mnt/gentoo/ --numeric-owner
