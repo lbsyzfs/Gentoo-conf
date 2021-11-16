@@ -1,0 +1,17 @@
+emerge layman
+#查找可由外行安装的所有可以挂载的存储库
+layman -L
+#安装
+layman -a mv
+layman -a lto-overlay
+#配置
+nano /var/lib/layman/make.conf
+PORTDIR_OVERLAY="
+${PORTDIR_OVERLAY}"
+
+nano /etc/portage/package.accept_keywords
+app-portage/portage-bashrc-mv ~amd64
+sys-config/ltoize ~amd64
+app-shells/runtitle ~amd64
+
+emerge sys-config/ltoize
