@@ -1,0 +1,13 @@
+net-libs/nodejs -lto
+# required by www-client/firefox-91.3.0::gentoo[system-libvpx]
+# required by firefox (argument)
+>=media-libs/libvpx-1.10.0 postproc
+# required by www-client/firefox-91.3.0::gentoo[pgo]
+# required by firefox (argument)
+>=x11-base/xorg-server-1.20.13-r1 xvfb
+# required by sys-boot/os-prober-1.78-r1::gentoo
+# required by sys-boot/os-prober (argument)
+>=sys-boot/grub-2.06-r1 mount
+# required by www-client/chromium-96.0.4664.45::gentoo
+# required by chromium (argument)
+>=net-libs/nodejs-14.17.6 inspector

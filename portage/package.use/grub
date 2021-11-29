@@ -1,0 +1,21 @@
+sys-boot/grub libzfs
+# required by media-libs/mesa-21.2.5::gentoo[-video_cards_radeon,-video_cards_r200,-video_cards_r100,-video_cards_r600,-video_cards_r300,video_cards_radeonsi]
+# required by virtual/opengl-7.0-r2::gentoo
+# required by media-libs/glu-9.0.2::gentoo
+# required by virtual/glu-9.0-r2::gentoo
+# required by media-libs/freeglut-3.2.1-r2::gentoo
+# required by app-text/mupdf-1.18.0-r4::gentoo[opengl]
+# required by net-print/cups-filters-1.28.7::gentoo[pdf]
+# required by net-print/cups-2.3.3_p2-r2::gentoo
+# required by app-text/ghostscript-gpl-9.54.0-r1::gentoo[cups]
+>=x11-libs/libdrm-2.4.107 video_cards_radeon
+# required by media-libs/mesa-21.2.5::gentoo[-video_cards_radeon,gallium,-video_cards_r600,llvm,video_cards_radeonsi,-opencl]
+# required by virtual/opengl-7.0-r2::gentoo
+# required by media-libs/glu-9.0.2::gentoo
+# required by virtual/glu-9.0-r2::gentoo
+# required by media-libs/freeglut-3.2.1-r2::gentoo
+# required by app-text/mupdf-1.18.0-r4::gentoo[opengl]
+# required by net-print/cups-filters-1.28.7::gentoo[pdf]
+# required by net-print/cups-2.3.3_p2-r2::gentoo
+# required by app-text/ghostscript-gpl-9.54.0-r1::gentoo[cups]
+>=sys-devel/llvm-13.0.0 llvm_targets_AMDGPU
